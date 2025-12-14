@@ -34,6 +34,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Run clippy
         run: RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
 
