@@ -2,7 +2,7 @@
 authors = ["Patrick Fernie <patrick.fernie@gmail.com>"]
 description = "Implementation of Cookie storage and retrieval"
 name = "cookie_store"
-version = "0.21.1" # managed by release.sh
+version = "0.22.0" # managed by release.sh
 edition = "2021"
 rust-version = "1.63.0"
 repository = "https://github.com/pfernie/cookie_store"
@@ -52,7 +52,7 @@ publicsuffix = { version = "2.2.3", optional = true }
 serde = { version = "1.0.147", optional = true }
 serde_derive = { version = "1.0.147", optional = true }
 serde_json = { version = "1.0.87", optional = true }
-ron = { version = "0.8.1", optional = true }
+ron = { version = "0.10.1", optional = true }
 
 [dependencies.cookie]
 features = ["percent-encode"]

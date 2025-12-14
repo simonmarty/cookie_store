@@ -77,13 +77,13 @@ impl CookieStore {
     ) {
         for cookie in cookies {
             if cookie.secure() != Some(true) || cfg!(feature = "log_secure_cookie_values") {
-                debug!("inserting Set-Cookie '{:?}'", cookie);
+                debug!("inserting Set-Cookie '{cookie:?}'");
             } else {
                 debug!("inserting secure cookie '{}'", cookie.name());
             }
 
             if let Err(e) = self.insert_raw(&cookie, url) {
-                debug!("unable to store Set-Cookie: {:?}", e);
+                debug!("unable to store Set-Cookie: {e:?}");
             }
         }
     }
@@ -302,7 +302,7 @@ impl CookieStore {
             let cookie_domain = cookie
                 .domain
                 .as_cow()
-                .ok_or_else(|| CookieError::UnspecifiedDomain)?;
+                .ok_or(CookieError::UnspecifiedDomain)?;
             if let Some(old_cookie) = self.get_mut(&cookie_domain, &cookie.path, cookie.name()) {
                 if old_cookie.http_only().unwrap_or(false) && !is_http_scheme(request_url) {
                     // 2.  If the newly created cookie was received from a "non-HTTP"
@@ -321,9 +321,9 @@ impl CookieStore {
                 if self
                     .cookies
                     .entry(String::from(&cookie.domain))
-                    .or_insert_with(Map::new)
+                    .or_default()
                     .entry(String::from(&cookie.path))
-                    .or_insert_with(Map::new)
+                    .or_default()
                     .insert(cookie.name().to_owned(), cookie)
                     .is_none()
                 {
@@ -464,17 +464,22 @@ impl CookieStore {
         })
     }
 
-    pub fn new(
-        #[cfg(feature = "public_suffix")] public_suffix_list: Option<publicsuffix::List>,
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
             cookies: DomainMap::new(),
             #[cfg(feature = "public_suffix")]
+            public_suffix_list: None,
+        }
+    }
+
+    #[cfg(feature = "public_suffix")]
+    pub fn new_with_public_suffix(public_suffix_list: Option<publicsuffix::List>) -> Self {
+        Self {
+            cookies: DomainMap::new(),
             public_suffix_list,
         }
     }
 }
-
 
 #[cfg(feature = "serde_json")]
 /// Legacy serialization implementations. These methods do **not** produce/consume valid JSON output compatible with
@@ -573,7 +578,10 @@ mod serde_legacy {
         where
             A: SeqAccess<'de>,
         {
-            super::CookieStore::from_cookies(std::iter::from_fn(|| seq.next_element().transpose()), false)
+            super::CookieStore::from_cookies(
+                std::iter::from_fn(|| seq.next_element().transpose()),
+                false,
+            )
         }
     }
 
@@ -840,7 +848,7 @@ mod tests {
         // foo.example.com, but the user agent will not accept a cookie with a
         // Domain attribute of "bar.example.com" or of "baz.foo.example.com".
         fn domain_cookie_from(domain: &str, request_url: &str) -> Cookie<'static> {
-            let cookie_str = format!("cookie1=value1; Domain={}", domain);
+            let cookie_str = format!("cookie1=value1; Domain={domain}");
             Cookie::parse(cookie_str, &test_utils::url(request_url)).unwrap()
         }
 
@@ -965,9 +973,17 @@ mod tests {
             Some(test_utils::in_days(1)),
             None,
         ));
-        assert!(store.iter_any().any(|c| c.name_value() == ("cookie1", "value1")), "did not find expected cookie1=value1 cookie in store");
+        assert!(
+            store
+                .iter_any()
+                .any(|c| c.name_value() == ("cookie1", "value1")),
+            "did not find expected cookie1=value1 cookie in store"
+        );
         store.clear();
-        assert!(store.iter_any().count() == 0, "found unexpected cookies in cleared store");
+        assert!(
+            store.iter_any().count() == 0,
+            "found unexpected cookies in cleared store"
+        );
     }
 
     #[test]
@@ -1044,19 +1060,12 @@ mod tests {
         for e in &exp {
             assert!(
                 matches.iter().any(|m| &m[..] == *e),
-                "{}: matches missing '{}'\nmatches: {:?}\n    exp: {:?}",
-                url,
-                e,
-                matches,
-                exp
+                "{url}: matches missing '{e}'\nmatches: {matches:?}\n    exp: {exp:?}"
             );
         }
         assert!(
             matches.len() == exp.len(),
-            "{}: matches={:?} != exp={:?}",
-            url,
-            matches,
-            exp
+            "{url}: matches={matches:?} != exp={exp:?}"
         );
     }
 
@@ -1236,7 +1245,7 @@ mod tests {
     #[cfg(feature = "serde_json")]
     #[allow(deprecated)]
     mod serde_json_tests {
-        use super::{CookieStore, StoreAction, add_cookie, make_match_store};
+        use super::{add_cookie, make_match_store, CookieStore, StoreAction};
         use crate::cookie::Cookie;
         use crate::CookieError;
 
@@ -1745,7 +1754,5 @@ mod tests {
             assert!(store.get("example.com", "/tmp", "cookie10").is_none());
             assert!(store.get_any("example.com", "/tmp", "cookie10").is_none());
         }
-
     }
 }
-
