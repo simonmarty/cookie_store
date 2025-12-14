@@ -9,6 +9,10 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   ci-pass:
     name: CI is green
@@ -28,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run clippy
         run: RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
@@ -39,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
@@ -55,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get MSRV package metadata
         id: metadata
@@ -128,9 +132,26 @@ jobs:
         toolchain: ${{ matrix.rust || 'stable' }}
         profile: minimal
         override: true
+        components: llvm-tools
+    - name: Install cargo-llvm-cov
+      uses: actions-rs/cargo@v1
+      with:
+        command: install
+        args: cargo-llvm-cov
 
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --verbose --all-features
+        args: --verbose --all-features --no-fail-fast
+    - name: Code Coverage
+      uses: actions-rs/cargo@v1
+      with:
+        command: llvm-cov
+        args: --verbose --all-features --codecov --output-path ./codecov.json
+    - name: Publish Code Coverage
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./codecov.json
+        fail_ci_if_error: true
+        use_oidc: true
